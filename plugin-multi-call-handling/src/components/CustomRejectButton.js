@@ -5,7 +5,6 @@ import {
   ContentFragment,
   IconButton,
   Manager,
-  templates,
   withTaskContext,
   withTheme
 } from '@twilio/flex-ui';

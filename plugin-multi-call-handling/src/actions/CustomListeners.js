@@ -1,10 +1,10 @@
-import { Actions, Manager, TaskHelper, StateHelper } from '@twilio/flex-ui';
+import { Actions, Manager, TaskHelper } from '@twilio/flex-ui';
 import FlexState from '../states/FlexState';
 import WorkerState from '../states/WorkerState';
 import ParkedCallsState from '../states/ParkedCallsState';
 import AcdCallsState from '../states/AcdCallsState';
 import CallService from '../services/CallService';
-import { ConferenceParticipantTypes, FlexActions, ReservationEvents } from '../utils/enums';
+import { FlexActions, ReservationEvents } from '../utils/enums';
 import utils from '../utils/utils';
 
 const reservationListeners = new Map();
@@ -279,7 +279,7 @@ const handleAfterHoldAction = async (payload, abortAction) => {
 
 const handleAfterUnholdAction = async (payload, abortAction) => {
   const { participantCallSid, task } = payload;
-  const { taskSid, attributes } = task;
+  const { taskSid } = task;
 
   if (utils.isCustomerParticipant(participantCallSid, taskSid)
     && utils.hasCustomHoldTime(task)

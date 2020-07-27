@@ -24,7 +24,7 @@ export default class MultiCallHandlingPlugin extends FlexPlugin {
    * @param manager { import('@twilio/flex-ui').Manager }
    */
   init(flex, manager) {
-    console.debug('Service Base URL:', process.env.REACT_APP_SERVICE_BASE_URL);
+    console.debug('Flex UI version', VERSION);
 
     const isPendingReservation = (props) => {
       const { task } = props;

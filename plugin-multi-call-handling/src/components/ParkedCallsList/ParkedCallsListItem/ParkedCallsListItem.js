@@ -1,7 +1,6 @@
 import React from 'react';
 import Tooltip from '@material-ui/core/Tooltip';
 import {
-  TaskHelper,
   withTaskContext,
   withTheme
 } from '@twilio/flex-ui';

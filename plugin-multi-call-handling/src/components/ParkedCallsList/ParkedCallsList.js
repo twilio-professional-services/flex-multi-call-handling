@@ -4,7 +4,6 @@ import FlipMove from 'react-flip-move';
 import { ContentFragment, FlexBox, withTaskContext, withTheme } from '@twilio/flex-ui';
 import {
   NoTasksCanvasContainer,
-  NoCallsContainer,
   ParkedCallsListHeader,
   ParkedCallsListHeaderContent,
   TasksListContainer

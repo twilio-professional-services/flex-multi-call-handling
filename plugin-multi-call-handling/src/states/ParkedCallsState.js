@@ -1,4 +1,4 @@
-import { Actions, TaskHelper } from '@twilio/flex-ui';
+import { Actions } from '@twilio/flex-ui';
 import FlexState from './FlexState';
 import WorkerState from './WorkerState';
 import SyncService from '../services/SyncService';
