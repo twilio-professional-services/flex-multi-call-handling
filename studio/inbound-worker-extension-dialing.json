@@ -1,0 +1,298 @@
+{
+  "description": "A New Flow",
+  "states": [
+    {
+      "name": "Trigger",
+      "type": "trigger",
+      "transitions": [
+        {
+          "event": "incomingMessage"
+        },
+        {
+          "next": "GatherExtension",
+          "event": "incomingCall"
+        },
+        {
+          "event": "incomingRequest"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "name": "GatherExtension",
+      "type": "gather-input-on-call",
+      "transitions": [
+        {
+          "next": "SetExtensionLength",
+          "event": "keypress"
+        },
+        {
+          "event": "speech"
+        },
+        {
+          "next": "SayNoResponse",
+          "event": "timeout"
+        }
+      ],
+      "properties": {
+        "voice": "Polly.Salli-Neural",
+        "number_of_digits": 4,
+        "speech_timeout": "auto",
+        "offset": {
+          "x": 40,
+          "y": 230
+        },
+        "loop": 1,
+        "finish_on_key": "#",
+        "say": "Please enter the 4 digit extension of the person you would like to call.",
+        "language": "en-US",
+        "stop_gather": true,
+        "gather_language": "en",
+        "profanity_filter": "true",
+        "timeout": 5
+      }
+    },
+    {
+      "name": "SayNoResponse",
+      "type": "say-play",
+      "transitions": [
+        {
+          "next": "GatherExtension",
+          "event": "audioComplete"
+        }
+      ],
+      "properties": {
+        "voice": "Polly.Salli-Neural",
+        "offset": {
+          "x": 420,
+          "y": 250
+        },
+        "loop": 1,
+        "say": "I didn't get a response. Please try again.",
+        "language": "en-US"
+      }
+    },
+    {
+      "name": "FunctionGetWorkerByExtension",
+      "type": "run-function",
+      "transitions": [
+        {
+          "next": "SplitGetWorkerByExtension",
+          "event": "success"
+        },
+        {
+          "event": "fail"
+        }
+      ],
+      "properties": {
+        "service_sid": "ZS00000000000000000000000000000000",
+        "environment_sid": "ZE00000000000000000000000000000000",
+        "offset": {
+          "x": 60,
+          "y": 980
+        },
+        "function_sid": "ZH00000000000000000000000000000000",
+        "parameters": [
+          {
+            "value": "{{widgets.GatherExtension.Digits}}",
+            "key": "extension"
+          }
+        ],
+        "url": "https://your-domain.twil.io/worker-lookup"
+      }
+    },
+    {
+      "name": "SetExtensionLength",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "SplitExtensionLength",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "{{ widgets.GatherExtension.Digits | size }}",
+            "key": "extensionLength"
+          }
+        ],
+        "offset": {
+          "x": 50,
+          "y": 480
+        }
+      }
+    },
+    {
+      "name": "SplitExtensionLength",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "next": "FunctionGetWorkerByExtension",
+          "event": "noMatch"
+        },
+        {
+          "next": "SayShortExtension",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "Less than 4",
+              "arguments": [
+                "{{flow.variables.extensionLength}}"
+              ],
+              "type": "less_than",
+              "value": "4"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{flow.variables.extensionLength}}",
+        "offset": {
+          "x": 50,
+          "y": 720
+        }
+      }
+    },
+    {
+      "name": "SayShortExtension",
+      "type": "say-play",
+      "transitions": [
+        {
+          "next": "GatherExtension",
+          "event": "audioComplete"
+        }
+      ],
+      "properties": {
+        "voice": "Polly.Salli-Neural",
+        "offset": {
+          "x": 420,
+          "y": 740
+        },
+        "loop": 1,
+        "say": "I only heard {{flow.variables.extensionLength}}  digits. Extensions must be 4 digits in length. Please try again.",
+        "language": "en-US"
+      }
+    },
+    {
+      "name": "SplitGetWorkerByExtension",
+      "type": "split-based-on",
+      "transitions": [
+        {
+          "event": "noMatch"
+        },
+        {
+          "next": "SetWorkerSid",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "success == true",
+              "arguments": [
+                "{{widgets.FunctionGetWorkerByExtension.parsed.success}}"
+              ],
+              "type": "equal_to",
+              "value": "true"
+            }
+          ]
+        },
+        {
+          "next": "SayWorkerLookupFailed",
+          "event": "match",
+          "conditions": [
+            {
+              "friendly_name": "success == false",
+              "arguments": [
+                "{{widgets.FunctionGetWorkerByExtension.parsed.success}}"
+              ],
+              "type": "equal_to",
+              "value": "false"
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "input": "{{widgets.FunctionGetWorkerByExtension.parsed.success}}",
+        "offset": {
+          "x": 60,
+          "y": 1220
+        }
+      }
+    },
+    {
+      "name": "SayWorkerLookupFailed",
+      "type": "say-play",
+      "transitions": [
+        {
+          "next": "GatherExtension",
+          "event": "audioComplete"
+        }
+      ],
+      "properties": {
+        "voice": "Polly.Salli-Neural",
+        "offset": {
+          "x": 570,
+          "y": 1240
+        },
+        "loop": 1,
+        "say": "<speak>\nI'm sorry. \n<say-as interpret-as=\"digits\">\n{{widgets.FunctionGetWorkerByExtension.parsed.message}} \n</say-as>\n<break />\nPlease try again.\n</speak>",
+        "language": "en-US"
+      }
+    },
+    {
+      "name": "SendToFlex",
+      "type": "send-to-flex",
+      "transitions": [
+        {
+          "event": "callComplete"
+        },
+        {
+          "event": "failedToEnqueue"
+        },
+        {
+          "event": "callFailure"
+        }
+      ],
+      "properties": {
+        "offset": {
+          "x": 70,
+          "y": 1740
+        },
+        "workflow": "WW00000000000000000000000000000000",
+        "channel": "TC00000000000000000000000000000000",
+        "attributes": "{\n \"type\": \"inbound\",\n \"name\": \"{{trigger.call.From}}\",\n \"isDirectCall\": true,\n \"targetWorker\": \"{{flow.variables.workerSid}}\"\n}",
+        "priority": "1000"
+      }
+    },
+    {
+      "name": "SetWorkerSid",
+      "type": "set-variables",
+      "transitions": [
+        {
+          "next": "SendToFlex",
+          "event": "next"
+        }
+      ],
+      "properties": {
+        "variables": [
+          {
+            "value": "{{widgets.FunctionGetWorkerByExtension.parsed.workerSid}}",
+            "key": "workerSid"
+          }
+        ],
+        "offset": {
+          "x": 70,
+          "y": 1470
+        }
+      }
+    }
+  ],
+  "initial_state": "Trigger",
+  "flags": {
+    "allow_concurrent_calls": true
+  }
+}
