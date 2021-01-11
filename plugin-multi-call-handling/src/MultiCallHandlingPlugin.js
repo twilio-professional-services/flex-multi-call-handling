@@ -4,10 +4,13 @@ import { FlexPlugin } from 'flex-plugin';
 
 import CustomTaskListButtons from './components/CustomTaskListButtons';
 import CustomIncomingTaskCanvasActions from './components/CustomIncomingTaskCanvasActions';
+import ParkButton from './components/ParkButton';
 import ParkedCallsList from './components/ParkedCallsList/ParkedCallsList';
 import LiveCallsList from './components/LiveCallsList/LiveCallsList';
+
 import './actions/CustomActions';
 import './actions/CustomListeners';
+import './notifications';
 
 const PLUGIN_NAME = 'MultiCallHandlingPlugin';
 
@@ -26,19 +29,29 @@ export default class MultiCallHandlingPlugin extends FlexPlugin {
   init(flex, manager) {
     console.debug('Flex UI version', VERSION);
 
-    const isPendingReservation = (props) => {
+    const isPendingCall = (props) => {
       const { task } = props;
-      return TaskHelper.isPending(task);
+      return TaskHelper.isCallTask(task) && TaskHelper.isPending(task);
+    }
+
+    const isLiveCall = (props) => {
+      const { task } = props;
+      return TaskHelper.isLiveCall(task);
     }
 
     flex.TaskListButtons.Content.replace(
-      <CustomTaskListButtons key='custom-task-list-buttons' />,
-      { if: isPendingReservation }
+      <CustomTaskListButtons key="custom-task-list-buttons" />,
+      { if: isPendingCall }
+    );
+
+    flex.TaskListButtons.Content.add(
+      <ParkButton key="task-list-park-button" iconSize="small" />,
+      { if: isLiveCall, sortOrder: -1 }
     );
 
     flex.IncomingTaskCanvasActions.Content.replace(
       <CustomIncomingTaskCanvasActions key='custom-incoming-task-canvas-actions' />,
-      { if: isPendingReservation }
+      { if: isPendingCall }
     );
 
     flex.TaskList.Content.add(

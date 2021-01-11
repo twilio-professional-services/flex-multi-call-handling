@@ -1,6 +1,7 @@
 import { Manager } from '@twilio/flex-ui';
 import { Mutex } from 'async-mutex';
 
+import SharedState from './SharedState';
 import AcdCallsState from './AcdCallsState';
 
 class WorkerState {
@@ -16,34 +17,26 @@ class WorkerState {
 
   _releaseAcdCallCountUpdateLock;
 
+  updateWorkerAttributes;
+
   get workerClient() { return this._manager.workerClient; }
 
   get workerSid() { return this.workerClient.sid; }
 
   get workerAttributes() { return this.workerClient.attributes; }
 
-  get workerAcdCallCount() { return this.workerAttributes.acdCallCount || 0; }
+  get workerAcdCallCount() { return this.workerAttributes.acdCallCount; }
 
-  updateWorkerAttributes = async (attributes) => {
-    // Leveraging mutex to ensure worker attribute updates within this plugin
-    // are handled synchronously, avoiding accidentally overwriting attributes.
-    // This requires all worker attribute updates going through this class method.
-    const mutexWorkerAttributes = new Mutex();
-    const mutexRelease = await mutexWorkerAttributes.acquire();
+  get workerActivity() { return this.workerClient?.activity; }
 
-    const newAttributes = {
-      ...this.workerAttributes,
-      ...attributes
-    };
+  get isInAvailableActivity() { return this.workerActivity?.available }
 
-    try {
-      await this.workerClient.setAttributes(newAttributes);
-      console.debug('Worker attributes updated', newAttributes);
-    } catch (error) {
-      console.error('Error updating worker attributes', error, newAttributes);
-    } finally {
-      mutexRelease();
-    }
+  initialize() {
+    console.debug('WorkerState initialize started');
+
+    this.updateWorkerAttributes = SharedState.workerService.updateWorkerAttributes;
+
+    console.debug('WorkerState initialize finished');
   }
 
   lockAcdCallCountUpdate = async () => {
@@ -76,10 +69,7 @@ class WorkerState {
       console.debug(`Worker acdCallCount already ${acdCallCount}. No update needed`);
     }
     else {
-      const attributes = {
-        ...this.workerAttributes,
-        acdCallCount
-      };
+      const attributes = { acdCallCount };
       try {
         await this.updateWorkerAttributes(attributes);
         console.debug('Worker acdCallCount set to:', acdCallCount);

@@ -1,7 +1,7 @@
 import { Actions } from '@twilio/flex-ui';
 import FlexState from './FlexState';
+import SharedState from './SharedState';
 import WorkerState from './WorkerState';
-import SyncService from '../services/SyncService';
 import { FlexActions } from '../utils/enums';
 import utils from '../utils/utils';
 
@@ -10,6 +10,8 @@ const syncMapSuffix = 'ParkedCalls';
 
 class ParkedCallsState {
   //#region Private Variables
+  _syncClient;
+
   _syncMapName = `${WorkerState.workerSid}.${syncMapSuffix}`;
 
   _syncMap;
@@ -64,7 +66,7 @@ class ParkedCallsState {
         componentStateName,
         {
           parkedCalls: this._syncMapItems,
-          syncing: false
+          isUpdatePending: false
         }
       );
       this._stateUpdateTimer = undefined;
@@ -104,7 +106,9 @@ class ParkedCallsState {
 
   initialize = async () => {
     console.debug('ParkedCallsState initialize started');
-    const syncMap = await SyncService.getSyncMap(this._syncMapName, this._syncMapTtl);
+
+    this._syncClient = SharedState.syncClient;
+    const syncMap = await this._syncClient.getSyncMap(this._syncMapName, this._syncMapTtl);
     if (syncMap.sid) {
       this._syncMap = syncMap;
     } else {
@@ -122,10 +126,14 @@ class ParkedCallsState {
     this._syncMap.on('itemRemoved', this._syncMapItemRemoved);
 
     // Refreshing the sync map TTL so it doesn't expire while actively being used
-    await SyncService.resetSyncMapTtl(this._syncMap, this._syncMapTtl);
+    await this._syncClient.resetSyncMapTtl(this._syncMap, this._syncMapTtl);
 
     this._initialized = true;
     console.debug('ParkedCallsState initialize finished');
+  }
+
+  setUpdatePending = (isUpdatePending) => {
+    FlexState.setComponentState(componentStateName, { isUpdatePending });
   }
 
   enablePickupLock = (conversationId) => {
@@ -140,28 +148,33 @@ class ParkedCallsState {
     this._pickupLockConversationId = undefined;
   }
 
-  // deleteMatchingParkedCall = (conversationId) => {
-  //   const parkedCalls = [...this._syncMapItems.values()];
-  //   const matchingParkedCall = parkedCalls.find(call => {
-  //     const { attributes } = call;
-  //     const conversations = attributes && attributes.conversations;
-  //     const callConversationId = conversations && conversations.conversation_id;
+  updateIsReservationPending = async (isReservationPending, callSid) => {
+    const item = this._syncMapItems.get(callSid);
 
-  //     return conversationId === callConversationId;
-  //   })
+    if (!item) return;
 
-  //   if (matchingParkedCall) {
-  //     try {
-  //       this._syncMap.remove(matchingParkedCall.callSid);
-  //     } catch (error) {
-  //       if (error.status === 404) {
-  //         console.debug(`Parked call matching conversation ID ${conversationId} not found`)
-  //       } else {
-  //         console.error(`Error removing parked call matching conversation ID ${conversationId}.`, error);
-  //       }
-  //     }
-  //   }
-  // }
+    item.isReservationPending = isReservationPending;
+
+    try {
+      const updatedItem = await this._syncMap.update(callSid, item);
+      console.debug('updateIsReservationPending, updatedItem:', updatedItem);
+    } catch (error) {
+      console.error('Error updating isReservationPending for sync map item', callSid);
+    }
+  }
+
+  deleteParkedCall = async (callSid) => {
+    const item = this._syncMapItems.get(callSid);
+
+    if (!item) return;
+
+    try {
+      await this._syncMap.remove(callSid);
+      console.debug('deleteParkedCall, deleted item', callSid);
+    } catch (error) {
+      console.error('Error deleting parked call sync map item', callSid);
+    }
+  }
 }
 
 const ParkedCallsStateSingleton = new ParkedCallsState();

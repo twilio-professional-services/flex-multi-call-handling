@@ -19,10 +19,10 @@ class AcdCallsState {
     });
 
     ParkedCallsState.parkedAcdCalls.forEach(call => {
-      const { callerHangup, attributes } = call;
+      const { attributes, callerHangup, isReservationPending } = call;
       const { conversations } = attributes;
 
-      if (callerHangup) {
+      if (callerHangup && !isReservationPending) {
         return;
       }
 

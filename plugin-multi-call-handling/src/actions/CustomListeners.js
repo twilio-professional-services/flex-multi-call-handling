@@ -4,20 +4,27 @@ import WorkerState from '../states/WorkerState';
 import ParkedCallsState from '../states/ParkedCallsState';
 import AcdCallsState from '../states/AcdCallsState';
 import CallService from '../services/CallService';
-import { FlexActions, ReservationEvents } from '../utils/enums';
+import {
+  FlexActions,
+  ParkedCallOutcome,
+  ReservationEvents,
+} from '../utils/enums';
 import utils from '../utils/utils';
 
 const reservationListeners = new Map();
+const actionsPendingReservationEnded = new Map();
 const manager = Manager.getInstance();
 
 manager.events.addListener('pluginsLoaded', () => {
   ParkedCallsState.initialize();
+  WorkerState.initialize();
 
   FlexState.workerTasks.forEach(reservation => {
     handleNewReservation(reservation);
   });
 });
 
+//#region Reservation Event Listeners and Handlers
 const stopReservationListeners = (reservation) => {
   const listeners = reservationListeners.get(reservation);
   if (listeners) {
@@ -28,13 +35,24 @@ const stopReservationListeners = (reservation) => {
   }
 };
 
+const handleReservationAccepted = (reservation) => {
+  const reservationSid = reservation.sid;
+  const task = reservation.task || reservation;
+  const { attributes } = task;
+  const { isParkHangup } = attributes;
+
+  if (isParkHangup) {
+    Actions.invokeAction(FlexActions.wrapupTask, { sid: reservationSid });
+  }
+}
+
 const handleReservationWrapup = async (reservation) => {
   const reservationSid = reservation.sid;
   const task = reservation.task || reservation;
   const { attributes } = task;
-  const { autoComplete } = attributes;
+  const { autoComplete, isParkHangup } = attributes;
 
-  if (utils.hasCustomHoldTime(task)) {
+  if (utils.hasCustomHoldTime(task) && !isParkHangup) {
     // Indicates the call disconnected while on hold, so the hold
     // time wasn't updated by a UnholdCall/Participant event
 
@@ -46,12 +64,32 @@ const handleReservationWrapup = async (reservation) => {
   }
 };
 
-const handleInboundAcdCompleted = async () => {
+const handleInboundAcdCompleted = () => {
   Actions.invokeAction(FlexActions.updateWorkerAcdCallCount);
 };
 
-const handleReservationEnded = (reservation) => {
+const handleReservationEnded = async (reservation) => {
   const task = reservation.task || reservation;
+  const { attributes } = task;
+  const { call_sid, conversations } = attributes;
+
+  console.debug('handleReservationEnded, actionsPendingReservationEnded:', actionsPendingReservationEnded);
+  console.debug('handleReservationEnded, reservation:', reservation);
+  const pendingAction = actionsPendingReservationEnded.get(reservation.sid);
+
+  if (pendingAction) {
+    console.debug('handleReservationEnded, pendingAction:', pendingAction);
+    actionsPendingReservationEnded.delete(reservation.sid);
+    Actions.invokeAction(pendingAction.action, pendingAction.payload);
+  }
+
+  if (!TaskHelper.isCallTask(task)) {
+    return;
+  }
+
+  if (call_sid && conversations?.outcome !== ParkedCallOutcome) {
+    await ParkedCallsState.deleteParkedCall(call_sid);
+  }
 
   if (utils.isInboundAcdCall(task)) {
     handleInboundAcdCompleted();
@@ -61,6 +99,10 @@ const handleReservationEnded = (reservation) => {
 const handleReservationUpdated = (event, reservation) => {
   console.debug('Event, reservation updated', event, reservation);
   switch (event) {
+    case ReservationEvents.accepted: {
+      handleReservationAccepted(reservation);
+      break; 
+    }
     case ReservationEvents.wrapup: {
       handleReservationWrapup(reservation);
       break;
@@ -97,6 +139,13 @@ const handleNewReservation = (reservation) => {
 };
 
 const handleInboundAcdReservation = (task) => {
+  const { attributes } = task;
+  const { call_sid, isParkHangup } = attributes;
+
+  if (isParkHangup) {
+    ParkedCallsState.updateIsReservationPending(false, call_sid);
+  }
+
   if (WorkerState.workerAcdCallCount === AcdCallsState.acdCallCount) {
     return;
   }
@@ -109,7 +158,6 @@ const releasePickupLockIfParked = (task) => {
   const { conversations } = attributes;
   const conversationId = conversations && conversations.conversation_id;
   
-  //ParkedCallsState.deleteMatchingParkedCall(conversationId);
   const { pickupLock } = ParkedCallsState;
   console.debug('releasePickupLockIfParked, '
     + `pickupLockEnabled: ${pickupLock.enabled}, `
@@ -127,8 +175,15 @@ const handleReservationCreated = (reservation) => {
   const { sid } = reservation;
   const task = TaskHelper.getTaskByTaskSid(sid);
   const { attributes } = task;
+  const { autoAnswer, isParkHangup } = attributes;
 
-  if (attributes && attributes.autoAnswer) {
+  if (isParkHangup) {
+    task.sourceObject.accept();
+    if (!FlexState.selectedTaskSid) {
+      Actions.invokeAction(FlexActions.selectTask, { sid });
+    }
+  }
+  else if (autoAnswer) {
     Actions.invokeAction(FlexActions.acceptTask, { task });
     Actions.invokeAction(FlexActions.selectTask, { sid });
   }
@@ -143,36 +198,42 @@ const handleReservationCreated = (reservation) => {
 manager.workerClient.on('reservationCreated', reservation => {
   handleReservationCreated(reservation);
 });
+//#endregion Reservation Event Listeners and Handlers
 
-Actions.addListener(`before${FlexActions.acceptTask}`, async payload => {
+//#region Flex Actions Event Listeners and Handlers
+Actions.addListener(`before${FlexActions.acceptTask}`, async (payload, abortAction) => {
   const { task } = payload;
-  if (!TaskHelper.isCallTask(task)) {
+  const { attributes } = task;
+  const { isParkHangup } = attributes;
+
+  if (!TaskHelper.isCallTask(task)
+    || TaskHelper.isInitialOutboundAttemptTask(task)
+    || isParkHangup
+  ) {
     return;
   }
 
   let liveCallTask;
+  let ringingOutboundTask;
   FlexState.workerTasks.forEach(task => {
     if (TaskHelper.isLiveCall(task)) {
       liveCallTask = task;
     }
+    else if (TaskHelper.isInitialOutboundAttemptTask(task)) {
+      ringingOutboundTask = task;
+    }
   });
   
   if (liveCallTask) {
-    const { attributes, taskSid } = liveCallTask;
-    const { conversations } = attributes;
-  
-    const conversationId = (conversations && conversations.conversation_id) || taskSid;
-    const newAttributes = {
-      ...attributes,
-      autoComplete: true,
-      conversations: {
-        ...attributes.conversations,
-        conversation_id: conversationId,
-        outcome: 'Parked Call'
-      }
-    };
-    await liveCallTask.setAttributes(newAttributes);
     await CallService.parkCall(liveCallTask);
+  }
+  else if (ringingOutboundTask) {
+    actionsPendingReservationEnded.set(ringingOutboundTask.sid, {
+      action: FlexActions.acceptTask,
+      payload
+    });
+    Actions.invokeAction(FlexActions.hangupCall, { task: ringingOutboundTask });
+    abortAction();
   }
 });
 
@@ -266,7 +327,7 @@ const updateTaskHoldTalkTime = async (task) => {
   await task.setAttributes(newAttributes);
 }
 
-const handleAfterHoldAction = async (payload, abortAction) => {
+const handleAfterHoldAction = async (payload) => {
   const { participantCallSid, task } = payload;
   const { taskSid } = task;
   
@@ -277,7 +338,7 @@ const handleAfterHoldAction = async (payload, abortAction) => {
   }
 };
 
-const handleAfterUnholdAction = async (payload, abortAction) => {
+const handleAfterUnholdAction = async (payload) => {
   const { participantCallSid, task } = payload;
   const { taskSid } = task;
 
@@ -295,3 +356,4 @@ Actions.addListener(`after${FlexActions.holdParticipant}`, handleAfterHoldAction
 Actions.addListener(`after${FlexActions.unholdCall}`, handleAfterUnholdAction);
 
 Actions.addListener(`after${FlexActions.unholdParticipant}`, handleAfterUnholdAction);
+//#endregion Flex Actions Event Listeners and Handlers

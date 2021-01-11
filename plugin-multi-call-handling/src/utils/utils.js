@@ -2,6 +2,8 @@ import { TaskHelper } from '@twilio/flex-ui';
 import FlexState from '../states/FlexState';
 import { ConferenceParticipantTypes, TaskDirections } from './enums';
 
+const baseServerlessUrl = `https://${process.env.REACT_APP_SERVERLESS_DOMAIN}`;
+
 const fetchPostUrlEncoded = (body) => ({
   method: 'POST',
   headers: {
@@ -35,11 +37,11 @@ const isCustomerParticipant = (participantCallSid, taskSid) => {
 
 const isInboundAcdCall = (task, isParkedCall) => {
   const { attributes } = task;
-  const { direction, isDirectCall } = attributes;
+  const { direction, directExtension } = attributes;
 
   return ((TaskHelper.isCallTask(task) || isParkedCall)
     && direction === TaskDirections.inbound
-    && !isDirectCall);
+    && !directExtension);
 };
 
 const hasCustomHoldTime = (task) => {
@@ -47,13 +49,23 @@ const hasCustomHoldTime = (task) => {
   const { conversations } = attributes;
 
   return !!(conversations && conversations.hold_time);
-}
+};
+
+const getDurationToNow = (startTime) => {
+  if (!startTime) {
+    return undefined;
+  }
+  const duration = Date.now() - Date.parse(startTime);
+  return msToTime(duration);
+};
 
 export default {
+  baseServerlessUrl,
   fetchPostUrlEncoded,
+  getDurationToNow,
   hasCustomHoldTime,
   isCustomerParticipant,
   isInboundAcdCall,
-  msToTime
+  msToTime,
 };
 

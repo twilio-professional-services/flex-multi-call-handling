@@ -32,6 +32,8 @@ class FlexState {
 
   get conferences() { return this.flexState.conferences.states; }
 
+  get selectedTaskSid() { return this.flexState.view?.selectedTaskSid; }
+
   setComponentState = (name, state) => {
     Actions.invokeAction(FlexActions.setComponentState, { name, state });
   }

@@ -1,9 +1,11 @@
 import React from 'react';
+import { connect } from 'react-redux';
 import {
   ActionStateListener,
   Actions,
   ContentFragment,
   IconButton,
+  TaskHelper,
   templates,
   withTaskContext,
   withTheme
@@ -19,7 +21,9 @@ class CustomAcceptButton extends React.PureComponent {
   }
 
   render() {
-    const { iconSize, theme } = this.props;
+    const { hasRingingOutboundCall, iconSize, task, theme } = this.props;
+
+    const isOutboundCall = TaskHelper.isOutboundCallTask(task);
 
     let className, icon, themeOverride;
     if (iconSize === 'large') {
@@ -41,7 +45,10 @@ class CustomAcceptButton extends React.PureComponent {
               themeOverride={themeOverride}
               onClick={this.onClick}
               icon={icon}
-              disabled={actionState.disabled}
+              disabled={
+                actionState.disabled
+                && (isOutboundCall || !hasRingingOutboundCall)
+              }
               title={templates.AcceptTaskTooltip()}
             />
           )}
@@ -51,4 +58,14 @@ class CustomAcceptButton extends React.PureComponent {
   }
 }
 
-export default withTheme(withTaskContext(CustomAcceptButton));
+const mapStateToProps = (state) => {
+  const workerTasks = state?.flex?.worker?.tasks || [];
+  const hasRingingOutboundCall = [...workerTasks.values()]
+    .some(task => TaskHelper.isInitialOutboundAttemptTask(task));
+
+  return {
+    hasRingingOutboundCall
+  }
+}
+
+export default connect(mapStateToProps)(withTheme(withTaskContext(CustomAcceptButton)));

@@ -21,6 +21,7 @@ export const FlexActions = {
   unholdCall: 'UnholdCall',
   unholdParticipant: 'UnholdParticipant',
   updateWorkerAcdCallCount: 'UpdateWorkerAcdCallCount',
+  wrapupTask: 'WrapupTask',
 };
 
 export const ConferenceParticipantTypes = {
@@ -37,5 +38,12 @@ export const TaskDirections = {
 export const TaskStatus = {
   reserved: 'reserved',
   assigned: 'assigned',
-  wrapping: 'wrapping'
+  wrapping: 'wrapping',
+  parked: 'parked'
+};
+
+export const ParkedCallOutcome = 'Parked Call';
+
+export const FlexNotification = {
+  changeActivityBeforeParkPickup: 'ChangeActivityBeforeParkPickup'
 };
