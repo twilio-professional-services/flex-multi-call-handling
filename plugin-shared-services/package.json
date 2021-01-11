@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@k88/pipe-compose": "^2.2.0",
+    "async-mutex": "^0.2.4",
     "flex-plugin-scripts": "^4.3.18-beta.0",
     "react": "16.5.2",
     "react-dom": "16.5.2"

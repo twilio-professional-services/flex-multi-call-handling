@@ -17,9 +17,10 @@ exports.handler = TokenValidator(async function(context, event, callback) {
   const client = Twilio(ACCOUNT_SID, AUTH_TOKEN);
 
   const {
+    attributes,
     callSid,
     name,
-    attributes,
+    queueName,
     workerSid,
     workflowSid
   } = event;
@@ -75,10 +76,11 @@ exports.handler = TokenValidator(async function(context, event, callback) {
   // Update the worker's parked calls sync map
   let syncMapName = `${workerSid}.${syncMapSuffix}`;
   let syncMapItemData = {
-    dateCreated: (new Date()).toISOString(),
-    callSid,
-    name,
     attributes,
+    callSid,
+    dateCreated: (new Date()).toISOString(),
+    name,
+    queueName,
     workerSid,
     workflowSid
   };
