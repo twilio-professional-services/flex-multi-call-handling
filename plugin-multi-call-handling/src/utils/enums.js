@@ -18,6 +18,7 @@ export const FlexActions = {
   selectTask: 'SelectTask',
   setActivity: 'SetActivity',
   setComponentState: 'SetComponentState',
+  startOutboundCall: 'StartOutboundCall',
   unholdCall: 'UnholdCall',
   unholdParticipant: 'UnholdParticipant',
   updateWorkerAcdCallCount: 'UpdateWorkerAcdCallCount',

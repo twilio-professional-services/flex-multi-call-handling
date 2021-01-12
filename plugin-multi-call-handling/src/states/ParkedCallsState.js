@@ -49,6 +49,33 @@ class ParkedCallsState {
     enabled: this._pickupLockEnabled,
     conversationId: this._pickupLockConversationId
   }; }
+
+  get hasParkedCall() {
+    if (!this._syncMapItems) {
+      return false;
+    }
+
+    return [...this._syncMapItems.values()]
+      .some(call => call.callerHangup === undefined);
+  }
+
+  get hasOutboundParkedCall() {
+    if (!this._syncMapItems) {
+      return false;
+    }
+
+    return [...this._syncMapItems.values()]
+      .some(call => utils.isOutboundCallTask(call));
+  }
+
+  get hasInboundParkedAcdCall() {
+    if (!this._syncMapItems) {
+      return false;
+    }
+
+    return [...this._syncMapItems.values()]
+      .some(call => utils.isInboundAcdCall(call, true));
+  }
   //#endregion Public Variables
 
   _updateSyncingState = (syncing) => {

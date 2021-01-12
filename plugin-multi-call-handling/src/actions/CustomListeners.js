@@ -1,5 +1,6 @@
 import { Actions, Manager, TaskHelper } from '@twilio/flex-ui';
 import FlexState from '../states/FlexState';
+import SharedState from '../states/SharedState';
 import WorkerState from '../states/WorkerState';
 import ParkedCallsState from '../states/ParkedCallsState';
 import AcdCallsState from '../states/AcdCallsState';
@@ -15,14 +16,106 @@ const reservationListeners = new Map();
 const actionsPendingReservationEnded = new Map();
 const manager = Manager.getInstance();
 
-manager.events.addListener('pluginsLoaded', () => {
-  ParkedCallsState.initialize();
+let _isPendingOutboundCall = false;
+
+manager.events.addListener('pluginsLoaded', async () => {
+  await ParkedCallsState.initialize();
   WorkerState.initialize();
 
   FlexState.workerTasks.forEach(reservation => {
     handleNewReservation(reservation);
   });
+
+  updateIsAcdReadyIfNeeded();
+  updateVoiceChannelCapacityIfNeeded();
 });
+
+// When changing to an ACD Ready Activity, the TaskRouter worker
+// activity change has to happen before the worker's attributes
+// are updated. This helper function is used to determine if the
+// worker attribute updated should occur in beforeSetActivity
+// (non-ACD Ready Activities) or afterSetActivity (ACD Ready Activities)
+const calculateIsAcdReady = () => {
+  let isAcdReady = false;
+  console.debug('calculateIsAcdReady, isInAvailableActivity:', WorkerState.isInAvailableActivity);
+  console.debug('calculateIsAcdReady, hasParkedCall:', ParkedCallsState.hasParkedCall);
+  console.debug('calculateIsAcdReady, hasInboundAcdCall:', FlexState.hasInboundAcdCall);
+  console.debug('calculateIsAcdReady, hasRingingOutboundCallTask:', FlexState.hasRingingOutboundCallTask);
+  console.debug('calculateIsAcdReady, _isPendingOutboundCall:', _isPendingOutboundCall);
+  console.debug('calculateIsAcdReady, hasInboundParkedAcdCall:', ParkedCallsState.hasInboundParkedAcdCall);
+
+  if (!WorkerState.isInAvailableActivity) {
+    isAcdReady = false;
+  }
+  else if (!ParkedCallsState.hasInboundParkedAcdCall
+    && !FlexState.hasInboundAcdCall
+	) {
+		isAcdReady = true;
+	}
+	else if ((FlexState.hasRingingOutboundCallTask || _isPendingOutboundCall)
+		&& !(FlexState.hasInboundAcdCall || ParkedCallsState.hasInboundParkedAcdCall)
+	) {
+		isAcdReady = true;
+	}
+
+	console.debug('calculateIsAcdReady, isAcdReady:', isAcdReady);
+	return isAcdReady;
+};
+
+const updateIsAcdReadyIfNeeded = async () => {
+	const isAcdReady = calculateIsAcdReady();
+
+	if (WorkerState.workerAttributes.isAcdReady !== isAcdReady){
+		let attrToUpdate = { isAcdReady };
+		await WorkerState.updateWorkerAttributes(attrToUpdate);
+
+		console.debug('updateIsAcdReadyIfNeeded: Worker attributes updated', attrToUpdate);
+	}
+}
+
+const calculateTargetVoiceChannelCapacity = () => {
+	let targetCapacity = WorkerState.defaultVoiceChannelCapacity;
+
+
+  if (ParkedCallsState.hasParkedCall
+    && !ParkedCallsState.isUpdatePending
+	) {
+    // With a parked call present, capacity must be one greater than the number
+    // of call tasks to allow retrieval of the parked call
+		targetCapacity = FlexState.workerCallTasks.length + 1;
+	}
+	else if (FlexState.hasActiveCallTask) {
+		targetCapacity = WorkerState.multiCallVoiceChannelCapacity;
+	}
+
+	console.debug('calculateTargetVoiceChannelCapacity, targetCapacity:', targetCapacity);
+	return targetCapacity;
+};
+
+const updateVoiceChannelCapacityIfNeeded = async (options) => {
+	let targetVoiceChannelCapacity;
+	
+	if (options && options.beforeHangupCall) {
+		const { payload } = options.beforeHangupCall;
+		const { task } = payload;
+
+		if (TaskHelper.isInitialOutboundAttemptTask(task)) {
+			targetVoiceChannelCapacity = WorkerState.defaultVoiceChannelCapacity;
+		} else {
+			// Only want to modify channel capacity for HangupCall if it's the
+			// initial outbound attempt task
+			return;
+		}
+	} else {
+		targetVoiceChannelCapacity = calculateTargetVoiceChannelCapacity();
+	}
+
+	if (WorkerState.voiceChannelCapacity !== targetVoiceChannelCapacity) {
+		await SharedState.updateVoiceChannelCapacity(targetVoiceChannelCapacity);
+	} else {
+		console.debug(`Voice channel capacity is already ${targetVoiceChannelCapacity}. No update needed.`);
+	}
+}
 
 //#region Reservation Event Listeners and Handlers
 const stopReservationListeners = (reservation) => {
@@ -35,7 +128,7 @@ const stopReservationListeners = (reservation) => {
   }
 };
 
-const handleReservationAccepted = (reservation) => {
+const handleReservationAccepted = async (reservation) => {
   const reservationSid = reservation.sid;
   const task = reservation.task || reservation;
   const { attributes } = task;
@@ -44,6 +137,8 @@ const handleReservationAccepted = (reservation) => {
   if (isParkHangup) {
     Actions.invokeAction(FlexActions.wrapupTask, { sid: reservationSid });
   }
+
+  await updateIsAcdReadyIfNeeded(WorkerState.workerActivityName);
 }
 
 const handleReservationWrapup = async (reservation) => {
@@ -64,7 +159,7 @@ const handleReservationWrapup = async (reservation) => {
   }
 };
 
-const handleInboundAcdCompleted = () => {
+const handleInboundAcdCompleted = async () => {
   Actions.invokeAction(FlexActions.updateWorkerAcdCallCount);
 };
 
@@ -94,6 +189,13 @@ const handleReservationEnded = async (reservation) => {
   if (utils.isInboundAcdCall(task)) {
     handleInboundAcdCompleted();
   }
+
+  // if (ParkedCallsState.isUpdatePending || ParkedCallsState.hasParkedCall) {
+	// 	await updateIsAcdReadyIfNeeded(WorkerState.workerActivitySid);
+  // }
+  
+  await updateVoiceChannelCapacityIfNeeded();
+  await updateIsAcdReadyIfNeeded();
 }
 
 const handleReservationUpdated = (event, reservation) => {
@@ -170,12 +272,16 @@ const releasePickupLockIfParked = (task) => {
   }
 }
 
-const handleReservationCreated = (reservation) => {
+const handleReservationCreated = async (reservation) => {
   handleNewReservation(reservation);
   const { sid } = reservation;
   const task = TaskHelper.getTaskByTaskSid(sid);
   const { attributes } = task;
   const { autoAnswer, isParkHangup } = attributes;
+
+  if (TaskHelper.isOutboundCallTask(reservation.task) && _isPendingOutboundCall) {
+		_isPendingOutboundCall = false;
+	}
 
   if (isParkHangup) {
     task.sourceObject.accept();
@@ -193,6 +299,9 @@ const handleReservationCreated = (reservation) => {
   if (utils.isInboundAcdCall(task)) {
     handleInboundAcdReservation(task)
   }
+
+  await updateIsAcdReadyIfNeeded();
+	await updateVoiceChannelCapacityIfNeeded();
 };
 
 manager.workerClient.on('reservationCreated', reservation => {
@@ -237,10 +346,33 @@ Actions.addListener(`before${FlexActions.acceptTask}`, async (payload, abortActi
   }
 });
 
+Actions.addListener(`before${FlexActions.hangupCall}`, async (payload) => {
+  const options = {
+		beforeHangupCall: {
+			payload
+		}
+	};
+	await updateVoiceChannelCapacityIfNeeded(options);
+})
+
+Actions.addListener(`before${FlexActions.completeTask}`, async (payload) => {
+	await updateVoiceChannelCapacityIfNeeded();
+})
+
+Actions.addListener(`before${FlexActions.setActivity}`, async (payload) => {
+	await updateVoiceChannelCapacityIfNeeded();
+})
+
 Actions.addListener(`after${FlexActions.setActivity}`, async (payload) => {
   // Using this event so a user can easily reset their acdCallsCount attribute
   // with the correct value without refreshing the browser
   Actions.invokeAction(FlexActions.updateWorkerAcdCallCount);
+
+  await updateIsAcdReadyIfNeeded();
+});
+
+Actions.addListener(`before${FlexActions.startOutboundCall}`, (payload, abortFunction) => {
+	_isPendingOutboundCall = true;
 });
 
 const storeHoldEventOnTask = async (task) => {

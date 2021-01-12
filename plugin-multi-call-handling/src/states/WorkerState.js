@@ -7,6 +7,12 @@ import AcdCallsState from './AcdCallsState';
 class WorkerState {
   _manager = Manager.getInstance();
 
+  _defaultVoiceChannelCapacity = 1;
+  get defaultVoiceChannelCapacity() { return this._defaultVoiceChannelCapacity; }
+
+  _multiCallVoiceChannelCapacity = 2;
+  get multiCallVoiceChannelCapacity() { return this._multiCallVoiceChannelCapacity; }
+
   _acdCallCountUpdateLock = new Mutex();
 
   // This setting controls how long a lock can be in place before it will be
@@ -30,6 +36,14 @@ class WorkerState {
   get workerActivity() { return this.workerClient?.activity; }
 
   get isInAvailableActivity() { return this.workerActivity?.available }
+
+  get workerChannels() { return this.workerClient.channels || new Map(); }
+
+  get workerVoiceChannel() {
+    return [...this.workerChannels.values()].find(c => c.taskChannelUniqueName === 'voice');
+  }
+
+  get voiceChannelCapacity() { return this.workerVoiceChannel?.capacity; }
 
   initialize() {
     console.debug('WorkerState initialize started');

@@ -44,6 +44,19 @@ const isInboundAcdCall = (task, isParkedCall) => {
     && !directExtension);
 };
 
+const isOutboundCallTask = (task) => {
+  const { attributes } = task;
+  const { direction } = attributes;
+
+  return direction && direction.toLowerCase().includes('outbound');
+};
+
+const isIncomingTransfer = (task) => {
+  const { incomingTransferObject } = task;
+
+  return incomingTransferObject !== undefined;
+};
+
 const hasCustomHoldTime = (task) => {
   const { attributes } = task;
   const { conversations } = attributes;
@@ -66,6 +79,8 @@ export default {
   hasCustomHoldTime,
   isCustomerParticipant,
   isInboundAcdCall,
+  isIncomingTransfer,
+  isOutboundCallTask,
   msToTime,
 };
 
