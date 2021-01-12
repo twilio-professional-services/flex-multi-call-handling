@@ -4,7 +4,6 @@ import { FlexPlugin } from 'flex-plugin';
 
 import reducers, { namespace } from './states/SharedServicesState';
 import SyncService from './services/SyncService';
-import TaskService from './services/TaskService';
 import WorkerService from './services/WorkerService';
 
 const PLUGIN_NAME = 'SharedServicesPlugin';
@@ -25,7 +24,6 @@ export default class SharedServicesPlugin extends FlexPlugin {
     this.registerReducers(manager);
 
     SyncService.initialize();
-    TaskService.initialize();
     WorkerService.initialize();
   }
 
