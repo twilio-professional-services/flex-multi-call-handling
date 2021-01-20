@@ -43,6 +43,13 @@ class FlexState {
     return item && JSON.parse(item);
   }
 
+  get hasCallTask() {
+    if (!this.workerTasks) return false;
+
+    return [...this.workerTasks.values()]
+      .some(task => TaskHelper.isCallTask(task));
+  }
+
   get hasLiveCallTask() {
     if (!this.workerTasks) return false;
 

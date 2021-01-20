@@ -36,26 +36,15 @@ manager.events.addListener('pluginsLoaded', async () => {
 // worker attribute updated should occur in beforeSetActivity
 // (non-ACD Ready Activities) or afterSetActivity (ACD Ready Activities)
 const calculateIsAcdReady = () => {
-  let isAcdReady = false;
-  console.debug('calculateIsAcdReady, isInAvailableActivity:', WorkerState.isInAvailableActivity);
-  console.debug('calculateIsAcdReady, hasParkedCall:', ParkedCallsState.hasParkedCall);
-  console.debug('calculateIsAcdReady, hasInboundAcdCall:', FlexState.hasInboundAcdCall);
-  console.debug('calculateIsAcdReady, hasRingingOutboundCallTask:', FlexState.hasRingingOutboundCallTask);
-  console.debug('calculateIsAcdReady, _isPendingOutboundCall:', _isPendingOutboundCall);
-  console.debug('calculateIsAcdReady, hasInboundParkedAcdCall:', ParkedCallsState.hasInboundParkedAcdCall);
+  let isAcdReady = true;
 
   if (!WorkerState.isInAvailableActivity) {
     isAcdReady = false;
   }
-  else if (!ParkedCallsState.hasInboundParkedAcdCall
-    && !FlexState.hasInboundAcdCall
+  else if (ParkedCallsState.hasParkedCall
+    || FlexState.hasCallTask
 	) {
-		isAcdReady = true;
-	}
-	else if ((FlexState.hasRingingOutboundCallTask || _isPendingOutboundCall)
-		&& !(FlexState.hasInboundAcdCall || ParkedCallsState.hasInboundParkedAcdCall)
-	) {
-		isAcdReady = true;
+		isAcdReady = false;
 	}
 
 	console.debug('calculateIsAcdReady, isAcdReady:', isAcdReady);
