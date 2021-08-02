@@ -52,7 +52,8 @@ class CustomTemplates {
       }
       case TaskStatus.parked: {
         const { attributes, callerHangup, dateCreated, queueName} = parkedCall;
-        const { directExtension, outbound_to } = attributes;
+        const { conversations, directExtension, outbound_to } = attributes;
+        const queue = conversations?.queue || queueName;
 
         const duration = utils.getDurationToNow(dateCreated);
 
@@ -64,7 +65,7 @@ class CustomTemplates {
         } else if (directExtension) {
           lineSuffix = '| Direct Call';
         } else {
-          lineSuffix = `| Queue: ${queueName}`
+          lineSuffix = `| Queue: ${queue}`
         }
         break;
       }
