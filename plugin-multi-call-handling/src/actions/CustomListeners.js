@@ -375,20 +375,6 @@ const storeHoldEventOnTask = async (task) => {
   await task.setAttributes(newAttributes);
 };
 
-const calculateTalkTime = (task, holdTime) => {
-  const { attributes } = task;
-  const { conversations } = attributes;
-  const { date } = conversations;
-  
-  console.debug('Call parked at', new Date(date).toLocaleString());
-
-  const acceptDurationMs = Date.now() - date;
-  const acceptDurationSeconds = Math.round(acceptDurationMs / 1000);
-  console.debug(`Calculated accept duration: ${acceptDurationSeconds} seconds`);
-
-  return acceptDurationSeconds - holdTime;
-}
-
 const calculateHoldTime = (task) => {
   const { attributes } = task;
   const { holdTimestamp, conversations } = attributes;
