@@ -434,17 +434,14 @@ const updateTaskHoldTalkTime = async (task) => {
   };
 
   const holdTime = calculateHoldTime(task);
-  const talkTime = calculateTalkTime(task, holdTime);
 
   newAttributes.conversations = {
     ...attributes.conversations,
     hold_time: holdTime,
-    talk_time: talkTime
   };
   delete newAttributes.holdTimestamp;
 
-  console.debug(`Setting hold time to ${holdTime} seconds `
-    + `and talk time to ${talkTime} seconds`);
+  console.debug(`Setting hold time to ${holdTime} seconds`);
   await task.setAttributes(newAttributes);
 }
 
