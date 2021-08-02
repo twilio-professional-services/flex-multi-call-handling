@@ -83,7 +83,8 @@ class ParkedCallsState {
   }
 
   _updateParkedCallsState = () => {
-    Actions.invokeAction(FlexActions.updateWorkerAcdCallCount);
+    // TODO: Remove when acdCallCount is no longer needed
+    //Actions.invokeAction(FlexActions.updateWorkerAcdCallCount);
 
     if (this._stateUpdateTimer) {
       clearTimeout(this._stateUpdateTimer);
@@ -135,6 +136,11 @@ class ParkedCallsState {
     console.debug('ParkedCallsState initialize started');
 
     this._syncClient = SharedState.syncClient;
+    if (!this._syncClient) {
+      console.error('Failed to initialize ParkedCallsState. SharedState.syncClient is undefined. '
+        + 'Check if the shared services plugin failed to load.');
+      return;
+    }
     const syncMap = await this._syncClient.getSyncMap(this._syncMapName, this._syncMapTtl);
     if (syncMap.sid) {
       this._syncMap = syncMap;

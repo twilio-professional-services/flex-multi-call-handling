@@ -13,14 +13,18 @@ class WorkerState {
   _multiCallVoiceChannelCapacity = 2;
   get multiCallVoiceChannelCapacity() { return this._multiCallVoiceChannelCapacity; }
 
+  // TODO: Remove when acdCallCount is no longer needed
   _acdCallCountUpdateLock = new Mutex();
 
   // This setting controls how long a lock can be in place before it will be
   // automatically cleared to ensure ACD count updates aren't blocked indefinitely
+  // TODO: Remove when acdCallCount is no longer needed
   _maxAcdCountUpdateLockTime = 15000
 
+  // TODO: Remove when acdCallCount is no longer needed
   _timerAcdCallCountUpdateLock;
 
+  // TODO: Remove when acdCallCount is no longer needed
   _releaseAcdCallCountUpdateLock;
 
   updateWorkerAttributes;
@@ -31,6 +35,7 @@ class WorkerState {
 
   get workerAttributes() { return this.workerClient.attributes; }
 
+  // TODO: Remove when acdCallCount is no longer needed
   get workerAcdCallCount() { return this.workerAttributes.acdCallCount; }
 
   get workerActivity() { return this.workerClient?.activity; }
@@ -48,11 +53,18 @@ class WorkerState {
   initialize() {
     console.debug('WorkerState initialize started');
 
+    if (!SharedState.workerService) {
+      console.error('Failed to initialize WorkerState. SharedState.workerService is undefined. '
+        + 'Check if the shared services plugin failed to load.');
+      return;
+    }
+
     this.updateWorkerAttributes = SharedState.workerService.updateWorkerAttributes;
 
     console.debug('WorkerState initialize finished');
   }
 
+  // TODO: Remove when acdCallCount is no longer needed
   lockAcdCallCountUpdate = async () => {
     console.debug('WorkerState, lockAcdCallCountUpdate, awaiting lock');
     this._releaseAcdCallCountUpdateLock = await this._acdCallCountUpdateLock.acquire();
@@ -65,6 +77,7 @@ class WorkerState {
     }, this._maxAcdCountUpdateLockTime);
   }
 
+  // TODO: Remove when acdCallCount is no longer needed
   releaseAcdCallCountUpdate = () => {
     console.debug('WorkerState, releaseAcdCallCountUpdate, releasing lock');
     if (this._timerAcdCallCountUpdateLock) {
@@ -74,6 +87,7 @@ class WorkerState {
     this._releaseAcdCallCountUpdateLock();
   }
 
+  // TODO: Remove when acdCallCount is no longer needed
   updateWorkerAcdCallCount = async () => {
     console.debug('WorkerState, updateWorkerAcdCallCount, awaiting lock');
     const mutexRelease = await this._acdCallCountUpdateLock.acquire();
