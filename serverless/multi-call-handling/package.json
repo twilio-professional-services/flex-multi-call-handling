@@ -11,7 +11,7 @@
     "twilio-run": "^2.0.0"
   },
   "engines": {
-    "node": "10.17.0"
+    "node": "12.22.1"
   },
   "dependencies": {
     "twilio": "^3.48.1",
