@@ -93,6 +93,7 @@ exports.handler = async function(context, event, callback) {
     };
     // Setting isReservationPending to ensure acdCallCount worker attribute
     // isn't deprecated before the task reservation arrives
+    // TODO: Is this still needed for the isAcdReady attribute
     if (isInboundAcdCall) syncMapItemData.isReservationPending = true;
 
     // Setting item TTL to a long enough value for the user to notice the
@@ -112,6 +113,7 @@ exports.handler = async function(context, event, callback) {
     autoComplete: false,
     call_sid: parsedAttributes.call_sid || callSid,
     isParkHangup: true,
+    name: parsedAttributes.name || parsedAttributes.outbound_to || parsedAttributes.from,
     targetWorker: workerSid,
     conversations: {
       ...parsedAttributes.conversations,
