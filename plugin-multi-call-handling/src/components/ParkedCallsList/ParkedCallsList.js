@@ -91,9 +91,7 @@ class ParkedCallsList extends React.PureComponent {
 }
 
 const mapStateToProps = (state) => {
-  const { componentViewStates } = state.flex.view;
-  const parkedCallsState = (componentViewStates && componentViewStates.ParkedCallsState) || {};
-  const parkedCalls = (parkedCallsState && parkedCallsState.parkedCalls) || new Map();
+  const parkedCalls = state.multiCall?.park?.parkedCalls || new Map();
   return {
     parkedCalls: Array.from(parkedCalls.values()),
   };

@@ -123,6 +123,10 @@ class FlexState {
   setComponentState = (name, state) => {
     Actions.invokeAction(FlexActions.setComponentState, { name, state });
   }
+
+  dispatchStoreAction = (payload) => {
+    this._manager.store.dispatch(payload);
+  }
 }
 
 const FlexStateSingleton = new FlexState();

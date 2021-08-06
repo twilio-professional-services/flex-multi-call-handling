@@ -2,6 +2,7 @@ import { Actions } from '@twilio/flex-ui';
 import FlexState from './FlexState';
 import SharedState from './SharedState';
 import WorkerState from './WorkerState';
+import { MultiCallActions } from '../states/MultiCallState';
 import { FlexActions } from '../utils/enums';
 import utils from '../utils/utils';
 
@@ -90,13 +91,19 @@ class ParkedCallsState {
       clearTimeout(this._stateUpdateTimer);
     }
     this._stateUpdateTimer = setTimeout(() => {
-      FlexState.setComponentState(
-        componentStateName,
-        {
-          parkedCalls: this._syncMapItems,
-          isUpdatePending: false
-        }
+      FlexState.dispatchStoreAction(
+        MultiCallActions.setParkedCalls(this._syncMapItems)
       );
+      FlexState.dispatchStoreAction(
+        MultiCallActions.setIsUpdatePending(false)
+      );
+      // FlexState.setComponentState(
+      //   componentStateName,
+      //   {
+      //     parkedCalls: this._syncMapItems,
+      //     isUpdatePending: false
+      //   }
+      // );
       this._stateUpdateTimer = undefined;
     }, this._stateUpdateDelayMs);
   }
@@ -166,7 +173,10 @@ class ParkedCallsState {
   }
 
   setUpdatePending = (isUpdatePending) => {
-    FlexState.setComponentState(componentStateName, { isUpdatePending });
+    FlexState.dispatchStoreAction(
+      MultiCallActions.setIsUpdatePending(isUpdatePending)
+    );
+    // FlexState.setComponentState(componentStateName, { isUpdatePending });
   }
 
   enablePickupLock = (conversationId) => {

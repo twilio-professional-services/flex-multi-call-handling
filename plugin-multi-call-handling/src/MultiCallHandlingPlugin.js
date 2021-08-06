@@ -2,6 +2,7 @@ import React from 'react';
 import { VERSION, TaskHelper } from '@twilio/flex-ui';
 import { FlexPlugin } from 'flex-plugin';
 
+import reducers, { namespace } from './states/MultiCallState';
 import CustomTaskListButtons from './components/CustomTaskListButtons';
 import CustomIncomingTaskCanvasActions from './components/CustomIncomingTaskCanvasActions';
 import ParkButton from './components/ParkButton';
@@ -28,6 +29,7 @@ export default class MultiCallHandlingPlugin extends FlexPlugin {
    */
   init(flex, manager) {
     console.debug('Flex UI version', VERSION);
+    this.registerReducers(manager);
 
     const isPendingCall = (props) => {
       const { task } = props;
@@ -68,5 +70,20 @@ export default class MultiCallHandlingPlugin extends FlexPlugin {
       <LiveCallsList key="live-calls-list" />,
       { sortOrder: -1 }
     );
+  }
+
+  /**
+   * Registers the plugin reducers
+   *
+   * @param manager { Flex.Manager }
+   */
+  registerReducers(manager) {
+    if (!manager.store.addReducer) {
+      // eslint: disable-next-line
+      console.error(`You need FlexUI > 1.9.0 to use built-in redux; you are currently on ${VERSION}`);
+      return;
+    }
+
+    manager.store.addReducer(namespace, reducers);
   }
 }
