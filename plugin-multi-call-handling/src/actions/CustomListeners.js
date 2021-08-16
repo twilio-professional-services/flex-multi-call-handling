@@ -148,10 +148,6 @@ const handleReservationWrapup = async (reservation) => {
   }
 };
 
-const handleInboundAcdCompleted = async () => {
-  Actions.invokeAction(FlexActions.updateWorkerAcdCallCount);
-};
-
 const handleReservationEnded = async (reservation) => {
   const task = reservation.task || reservation;
   const { attributes } = task;
@@ -174,14 +170,6 @@ const handleReservationEnded = async (reservation) => {
   if (call_sid && conversations?.outcome !== ParkedCallOutcome) {
     await ParkedCallsState.deleteParkedCall(call_sid);
   }
-
-  if (utils.isInboundAcdCall(task)) {
-    handleInboundAcdCompleted();
-  }
-
-  // if (ParkedCallsState.isUpdatePending || ParkedCallsState.hasParkedCall) {
-	// 	await updateIsAcdReadyIfNeeded(WorkerState.workerActivitySid);
-  // }
   
   await updateVoiceChannelCapacityIfNeeded();
   await updateIsAcdReadyIfNeeded();
@@ -236,12 +224,6 @@ const handleInboundAcdReservation = (task) => {
   if (isParkHangup) {
     ParkedCallsState.updateIsReservationPending(false, call_sid);
   }
-
-  if (WorkerState.workerAcdCallCount === AcdCallsState.acdCallCount) {
-    return;
-  }
-
-  Actions.invokeAction(FlexActions.updateWorkerAcdCallCount);
 }
 
 const releasePickupLockIfParked = (task) => {
@@ -256,7 +238,6 @@ const releasePickupLockIfParked = (task) => {
   if (ParkedCallsState.pickupLock.enabled
     && ParkedCallsState.pickupLock.conversationId === conversationId
   ) {
-    WorkerState.releaseAcdCallCountUpdate();
     ParkedCallsState.clearPickupLock();
   }
 }
@@ -353,10 +334,8 @@ Actions.addListener(`before${FlexActions.setActivity}`, async (payload) => {
 })
 
 Actions.addListener(`after${FlexActions.setActivity}`, async (payload) => {
-  // Using this event so a user can easily reset their acdCallsCount attribute
+  // Using this event so a user can easily reset their isAcdReady attribute
   // with the correct value without refreshing the browser
-  Actions.invokeAction(FlexActions.updateWorkerAcdCallCount);
-
   await updateIsAcdReadyIfNeeded();
 });
 

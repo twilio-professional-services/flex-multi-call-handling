@@ -73,7 +73,6 @@ class CallService {
     const conversationId = attributes.conversations.conversation_id;
 
     ParkedCallsState.enablePickupLock(conversationId);
-    WorkerState.lockAcdCallCountUpdate();
 
     const pickupParkedCallUrl = `${utils.baseServerlessUrl}/pickup-parked-call`;
     const fetchBody = {

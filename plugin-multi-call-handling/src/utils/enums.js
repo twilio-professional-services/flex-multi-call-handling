@@ -21,7 +21,6 @@ export const FlexActions = {
   startOutboundCall: 'StartOutboundCall',
   unholdCall: 'UnholdCall',
   unholdParticipant: 'UnholdParticipant',
-  updateWorkerAcdCallCount: 'UpdateWorkerAcdCallCount',
   wrapupTask: 'WrapupTask',
 };
 

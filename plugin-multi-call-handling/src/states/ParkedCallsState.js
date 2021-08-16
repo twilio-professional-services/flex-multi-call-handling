@@ -79,14 +79,7 @@ class ParkedCallsState {
   }
   //#endregion Public Variables
 
-  _updateSyncingState = (syncing) => {
-    FlexState.setComponentState(componentStateName, { syncing });
-  }
-
   _updateParkedCallsState = () => {
-    // TODO: Remove when acdCallCount is no longer needed
-    //Actions.invokeAction(FlexActions.updateWorkerAcdCallCount);
-
     if (this._stateUpdateTimer) {
       clearTimeout(this._stateUpdateTimer);
     }
