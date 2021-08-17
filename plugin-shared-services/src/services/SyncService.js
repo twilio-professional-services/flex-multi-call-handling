@@ -1,5 +1,6 @@
 import TwilioSync from 'twilio-sync';
 import FlexState from '../states/FlexState';
+import { SyncActions } from '../states/SharedServicesState';
 
 class SyncService {
   constructor() {
@@ -15,6 +16,10 @@ class SyncService {
     const accessToken = tokenInfo.token;
 
     this._syncClient.updateToken(accessToken);
+  }
+
+  initialize = () => {
+    FlexState.dispatchStoreAction(SyncActions.setSyncClient(SyncServiceSingleton));
   }
 
   getSyncMap = async (syncMapName, syncMapTtl) => {

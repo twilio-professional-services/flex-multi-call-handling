@@ -76,15 +76,26 @@ exports.handler = async function(context, event, callback) {
   syncMapPromises.push(deleteSyncMapItem(syncMapName, callSid));
 
   const globalParkedCall = globalSyncMapItem.data || {};
-  const { workerSid } = globalParkedCall;
+  const { attributes, workerSid } = globalParkedCall;
+
+  const parsedAttributes = JSON.parse(attributes);
+  const { direction, directExtension } = parsedAttributes;
+
+  const isInboundAcdCall = ((direction && direction.toLowerCase() === 'inbound')
+    && (directExtension === undefined));
 
   if (workerSid) {
     syncMapName = `${workerSid}.${syncMapSuffix}`;
     const syncMapItemData = {
       ...globalParkedCall,
       callerHangup: true,
-      callerHangupTime: new Date().toISOString()
+      callerHangupTime: new Date().toISOString(),
     };
+    // Setting isReservationPending to ensure acdCallCount worker attribute
+    // isn't deprecated before the task reservation arrives
+    // TODO: Is this still needed for the isAcdReady attribute
+    if (isInboundAcdCall) syncMapItemData.isReservationPending = true;
+
     // Setting item TTL to a long enough value for the user to notice the
     // caller hung up before it disappears from the parked call list
     const syncMapItemTtl = 120;
@@ -93,42 +104,39 @@ exports.handler = async function(context, event, callback) {
 
   await Promise.all(syncMapPromises);
 
-  const { dateCreated, attributes, workflowSid } = globalParkedCall;
+  const { dateCreated, workflowSid } = globalParkedCall;
 
   const holdDuration = convertMsToSec(Date.now() - Date.parse(dateCreated));
-  const parsedAttributes = JSON.parse(attributes);
 
   const newTaskAttributes = {
     ...parsedAttributes,
-    targetWorker: 'nobody',
+    autoComplete: false,
+    call_sid: parsedAttributes.call_sid || callSid,
+    isParkHangup: true,
+    name: parsedAttributes.name || parsedAttributes.outbound_to || parsedAttributes.from,
+    targetWorker: workerSid,
     conversations: {
       ...parsedAttributes.conversations,
       date: Date.parse(dateCreated),
       hold_time: holdDuration,
       outcome: 'Hangup While Parked',
-      queue_time: 0
+      queue_time: 0,
+      ring_time: 0,
+      talk_time: 0
     }
   };
 
-  console.log('Creating task to capture park time before hangup');
+  console.log('Creating task for worker to have a wrapup task');
   const task = await client.taskrouter
     .workspaces(WORKSPACE_SID)
     .tasks
     .create({
       workflowSid,
-      attributes: JSON.stringify(newTaskAttributes)
+      taskChannel: 'voice',
+      attributes: JSON.stringify(newTaskAttributes),
+      priority: 1000
     });
   console.log(`Created task ${task.sid}`);
-
-  console.log(`Cancelling task ${task.sid}`);
-  await client.taskrouter
-    .workspaces(WORKSPACE_SID)
-    .tasks(task.sid)
-    .update({
-      assignmentStatus: 'canceled',
-      reason: 'Hangup While Parked'
-    });
-  console.log(`Canceled task ${task.sid}`);
 
   callback(null, {});
 };

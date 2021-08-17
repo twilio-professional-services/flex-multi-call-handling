@@ -1,20 +1,17 @@
 import { Manager } from '@twilio/flex-ui';
-import { Mutex } from 'async-mutex';
 
-import AcdCallsState from './AcdCallsState';
+import SharedState from './SharedState';
 
 class WorkerState {
   _manager = Manager.getInstance();
 
-  _acdCallCountUpdateLock = new Mutex();
+  _defaultVoiceChannelCapacity = 1;
+  get defaultVoiceChannelCapacity() { return this._defaultVoiceChannelCapacity; }
 
-  // This setting controls how long a lock can be in place before it will be
-  // automatically cleared to ensure ACD count updates aren't blocked indefinitely
-  _maxAcdCountUpdateLockTime = 15000
+  _multiCallVoiceChannelCapacity = 2;
+  get multiCallVoiceChannelCapacity() { return this._multiCallVoiceChannelCapacity; }
 
-  _timerAcdCallCountUpdateLock;
-
-  _releaseAcdCallCountUpdateLock;
+  updateWorkerAttributes;
 
   get workerClient() { return this._manager.workerClient; }
 
@@ -22,73 +19,30 @@ class WorkerState {
 
   get workerAttributes() { return this.workerClient.attributes; }
 
-  get workerAcdCallCount() { return this.workerAttributes.acdCallCount || 0; }
+  get workerActivity() { return this.workerClient?.activity; }
 
-  updateWorkerAttributes = async (attributes) => {
-    // Leveraging mutex to ensure worker attribute updates within this plugin
-    // are handled synchronously, avoiding accidentally overwriting attributes.
-    // This requires all worker attribute updates going through this class method.
-    const mutexWorkerAttributes = new Mutex();
-    const mutexRelease = await mutexWorkerAttributes.acquire();
+  get isInAvailableActivity() { return this.workerActivity?.available }
 
-    const newAttributes = {
-      ...this.workerAttributes,
-      ...attributes
-    };
+  get workerChannels() { return this.workerClient.channels || new Map(); }
 
-    try {
-      await this.workerClient.setAttributes(newAttributes);
-      console.debug('Worker attributes updated', newAttributes);
-    } catch (error) {
-      console.error('Error updating worker attributes', error, newAttributes);
-    } finally {
-      mutexRelease();
-    }
+  get workerVoiceChannel() {
+    return [...this.workerChannels.values()].find(c => c.taskChannelUniqueName === 'voice');
   }
 
-  lockAcdCallCountUpdate = async () => {
-    console.debug('WorkerState, lockAcdCallCountUpdate, awaiting lock');
-    this._releaseAcdCallCountUpdateLock = await this._acdCallCountUpdateLock.acquire();
-    console.debug('WorkerState, lockAcdCallCountUpdate, lock acquired');
-    this._timerAcdCallCountUpdateLock = setTimeout(() => {
-      if (this._acdCallCountUpdateLock.isLocked()) {
-        this.releaseAcdCallCountUpdate();
-      }
-      this._timerAcdCallCountUpdateLock = undefined;
-    }, this._maxAcdCountUpdateLockTime);
-  }
+  get voiceChannelCapacity() { return this.workerVoiceChannel?.capacity; }
 
-  releaseAcdCallCountUpdate = () => {
-    console.debug('WorkerState, releaseAcdCallCountUpdate, releasing lock');
-    if (this._timerAcdCallCountUpdateLock) {
-      clearTimeout(this._timerAcdCallCountUpdateLock);
-      this._timerAcdCallCountUpdateLock = undefined;
-    }
-    this._releaseAcdCallCountUpdateLock();
-  }
+  initialize() {
+    console.debug('WorkerState initialize started');
 
-  updateWorkerAcdCallCount = async () => {
-    console.debug('WorkerState, updateWorkerAcdCallCount, awaiting lock');
-    const mutexRelease = await this._acdCallCountUpdateLock.acquire();
-    console.debug('WorkerState, updateWorkerAcdCallCount, lock acquired');
-    const { acdCallCount } = AcdCallsState;
-    if (this.workerAcdCallCount === acdCallCount) {
-      console.debug(`Worker acdCallCount already ${acdCallCount}. No update needed`);
+    if (!SharedState.workerService) {
+      console.error('Failed to initialize WorkerState. SharedState.workerService is undefined. '
+        + 'Check if the shared services plugin failed to load.');
+      return;
     }
-    else {
-      const attributes = {
-        ...this.workerAttributes,
-        acdCallCount
-      };
-      try {
-        await this.updateWorkerAttributes(attributes);
-        console.debug('Worker acdCallCount set to:', acdCallCount);
-      } catch (error) {
-        console.error('Error updating worker attributes.', error);
-      }
-    }
-    console.debug('WorkerState, updateWorkerAcdCallCount, releasing lock');
-    mutexRelease();
+
+    this.updateWorkerAttributes = SharedState.workerService.updateWorkerAttributes;
+
+    console.debug('WorkerState initialize finished');
   }
 }
 

@@ -1,26 +1,51 @@
+import { Notifications } from '@twilio/flex-ui';
+
 import utils from '../utils/utils';
+import { FlexNotification, ParkedCallOutcome } from '../utils/enums';
 import FlexState from '../states/FlexState';
 import ParkedCallsState from '../states/ParkedCallsState';
 import WorkerState from '../states/WorkerState';
 
 class CallService {
-  static baseUrl = `https://${process.env.REACT_APP_SERVERLESS_DOMAIN}`
-
   static parkCall = async (task) => {
-    console.debug('Parking call');
-    const { attributes, conference, taskSid, workerSid, workflowSid } = task;
-    const { name, outbound_to } = attributes;
-    const nameValue = name || outbound_to;
+    const {
+      attributes,
+      conference,
+      taskSid,
+      queueName,
+      workerSid,
+      workflowSid } = task;
+
+    console.debug('Parking call for task', taskSid);
+
+    ParkedCallsState.setUpdatePending(true);
+
+    const { conversations, caller, name, outbound_to } = attributes;
+
+    const conversationId = (conversations && conversations.conversation_id) || taskSid;
+    const newAttributes = {
+      ...attributes,
+      autoComplete: true,
+      conversations: {
+        ...attributes.conversations,
+        conversation_id: conversationId,
+        outcome: ParkedCallOutcome,
+      }
+    };
+    await task.setAttributes(newAttributes);
+
+    const nameValue = name || caller || outbound_to;
     const { participants } = conference;
     const customerParticipant = participants.find(p => p.participantType === 'customer');
     const { callSid } = customerParticipant;
 
-    const parkCallUrl = `${this.baseUrl}/park-call`;
+    const parkCallUrl = `${utils.baseServerlessUrl}/park-call`;
     const fetchBody = {
       Token: FlexState.userToken,
+      attributes: JSON.stringify(newAttributes),
       callSid,
       name: nameValue,
-      attributes: JSON.stringify(attributes),
+      queueName,
       taskSid,
       workerSid,
       workflowSid
@@ -32,20 +57,31 @@ class CallService {
   }
 
   static pickupParkedCall = async (parkedCall, workerSid) => {
+    if (!WorkerState.isInAvailableActivity) {
+      Notifications.showNotification(FlexNotification.changeActivityBeforeParkPickup);
+      return;
+    }
+
     console.debug('Picking up parked call');
-    const { callSid, dateCreated, name, attributes, workflowSid } = parkedCall;
-    const conversationId = attributes.conversations.conversation_id;
-
-    ParkedCallsState.enablePickupLock(conversationId);
-    WorkerState.lockAcdCallCountUpdate();
-
-    const pickupParkedCallUrl = `${this.baseUrl}/pickup-parked-call`;
-    const fetchBody = {
-      Token: FlexState.userToken,
+    const {
+      attributes,
       callSid,
       dateCreated,
       name,
+      queueName,
+      workflowSid } = parkedCall;
+    const conversationId = attributes.conversations.conversation_id;
+
+    ParkedCallsState.enablePickupLock(conversationId);
+
+    const pickupParkedCallUrl = `${utils.baseServerlessUrl}/pickup-parked-call`;
+    const fetchBody = {
+      Token: FlexState.userToken,
       attributes: JSON.stringify(attributes),
+      callSid,
+      dateCreated,
+      name,
+      queueName,
       workerSid,
       workflowSid
     };

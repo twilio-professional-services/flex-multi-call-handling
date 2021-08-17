@@ -4,6 +4,7 @@ import {
   withTaskContext,
   withTheme
 } from '@twilio/flex-ui';
+
 import {
   Container,
   Content,
@@ -15,7 +16,9 @@ import {
 } from './ParkedCallsListItem.Components';
 import CallService from '../../../services/CallService';
 import utils from '../../../utils/utils';
+import { TaskStatus } from '../../../utils/enums';
 import WorkerState from '../../../states/WorkerState';
+import CustomTemplates from '../../../templates/CustomTemplates';
 
 class ParkedCallsListItem extends React.PureComponent {
   refreshTimer;
@@ -51,13 +54,13 @@ class ParkedCallsListItem extends React.PureComponent {
 
   render() {
     const { parkedCall, theme } = this.props;
-    const { callerHangup, dateCreated, name } = parkedCall;
-    const duration = this.getDuration(dateCreated);
+    const { callerHangup, name } = parkedCall;
+
     const itemProps = {
       icon: callerHangup ? 'Hangup' : 'Call',
       iconColor: callerHangup ? '#a0a8bd' : theme.colors.holdColor,
-      firstLine: name || 'First line text',
-      secondLine: `${callerHangup ? 'Caller hung up' : 'Parked'}${duration ? ` | ${duration}` : ''}`,
+      firstLine: name || '',
+      secondLine: CustomTemplates.generateTaskLineTwoString(TaskStatus.parked, parkedCall),
       extraInfo: 'none'
     };
     return (

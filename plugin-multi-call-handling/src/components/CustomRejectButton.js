@@ -1,10 +1,12 @@
 import React from 'react';
+import { connect } from 'react-redux';
 import {
   ActionStateListener,
   Actions,
   ContentFragment,
   IconButton,
   Manager,
+  TaskHelper,
   withTaskContext,
   withTheme
 } from '@twilio/flex-ui';
@@ -19,11 +21,13 @@ class CustomRejectButton extends React.PureComponent {
   }
 
   render() {
-    const { iconSize, task, theme } = this.props;
+    const { hasRingingOutboundCall, iconSize, task, theme } = this.props;
     const { attributes: taskAttributes } = task;
     const { isDirectCall } = taskAttributes;
     const { attributes: workerAttributes } = Manager.getInstance().workerClient;
     const { isVoicemailEnabled } = workerAttributes;
+
+    const isOutboundCall = TaskHelper.isOutboundCallTask(task);
 
     const tooltip = isDirectCall && isVoicemailEnabled
       ? 'Send to Voicemail'
@@ -49,7 +53,10 @@ class CustomRejectButton extends React.PureComponent {
               themeOverride={themeOverride}
               onClick={this.onClick}
               icon={icon}
-              disabled={actionState.disabled}
+              disabled={
+                actionState.disabled
+                && (isOutboundCall || !hasRingingOutboundCall)
+              }
               title={tooltip}
             />
           )}
@@ -59,4 +66,14 @@ class CustomRejectButton extends React.PureComponent {
   }
 }
 
-export default withTheme(withTaskContext(CustomRejectButton));
+const mapStateToProps = (state) => {
+  const workerTasks = state?.flex?.worker?.tasks || [];
+  const hasRingingOutboundCall = [...workerTasks.values()]
+    .some(task => TaskHelper.isInitialOutboundAttemptTask(task));
+
+  return {
+    hasRingingOutboundCall
+  }
+}
+
+export default connect(mapStateToProps)(withTheme(withTaskContext(CustomRejectButton)));

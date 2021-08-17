@@ -16,10 +16,11 @@ exports.handler = TokenValidator(async function(context, event, callback) {
   const client = Twilio(ACCOUNT_SID, AUTH_TOKEN);
 
   const {
+    attributes,
     callSid,
     dateCreated,
     name,
-    attributes,
+    queueName,
     workerSid,
     workflowSid
   } = event;
@@ -49,6 +50,7 @@ exports.handler = TokenValidator(async function(context, event, callback) {
     ...newAttributes,
     autoComplete: undefined,
     autoAnswer: true,
+    isParkPickup: true,
     targetWorker: workerSid,
     conversations: {
       ...newAttributes.conversations,
@@ -60,6 +62,9 @@ exports.handler = TokenValidator(async function(context, event, callback) {
   };
   if (!newAttributes.name) {
     newAttributes.name = name;
+  }
+  if (!newAttributes.conversations.queue) {
+    newAttributes.conversations.queue = queueName;
   }
 
   const twiml = new Twilio.twiml.VoiceResponse();

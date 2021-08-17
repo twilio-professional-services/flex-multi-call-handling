@@ -119,3 +119,4 @@ dist
 
 # Twilio serverless function files
 .twilio-functions
+.twiliodeployinfo
