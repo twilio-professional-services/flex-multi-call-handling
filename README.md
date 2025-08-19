@@ -1,3 +1,7 @@
+# Notice - Legacy Code
+
+**This plugin is no longer maintained. An updated version of the plugin is available as part of the customizable [Flex Project Template](https://github.com/twilio-professional-services/flex-project-template), where it is an optional feature.**
+
 # Flex Multi-Call Handling
 ## Disclaimer
 **This software is to be considered "sample code", a Type B Deliverable, and is delivered "as-is" to the user. Twilio bears no responsibility to support the use or implementation of this software.**
